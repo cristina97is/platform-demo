@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:17
+    container_name: event-service-db
+    environment:
+      POSTGRES_DB: events
+      POSTGRES_USER: events
+      POSTGRES_PASSWORD: events
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations/001_create_events_table.sql:/docker-entrypoint-initdb.d/001_create_events_table.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U events -d events"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    container_name: event-service-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: events
+      DB_USER: events
+      DB_PASSWORD: events
+      DB_SSLMODE: disable
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
