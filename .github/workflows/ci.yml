@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/event-service
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/event-service/go.mod
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'latest'
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Run Go tests
+        run: go test ./...
+
+      - name: Validate Kubernetes manifests
+        working-directory: apps/event-service/k8s
+        run: |
+          kubectl apply --dry-run=client -f namespace.yaml
+          kubectl apply --dry-run=client -f secret.yaml
+          kubectl apply --dry-run=client -f configmap.yaml
+          kubectl apply --dry-run=client -f db-pvc.yaml
+          kubectl apply --dry-run=client -f db-init-configmap.yaml
+          kubectl apply --dry-run=client -f db-deployment.yaml
+          kubectl apply --dry-run=client -f db-service.yaml
+          kubectl apply --dry-run=client -f api-deployment.yaml
+          kubectl apply --dry-run=client -f api-service.yaml
+          kubectl apply --dry-run=client -f ingress.yaml
+          kubectl apply --dry-run=client -f api-hpa.yaml
+          kubectl apply --dry-run=client -f api-pdb.yaml
+
+      - name: Build Docker image
+        run: docker build -t event-service:ci .
