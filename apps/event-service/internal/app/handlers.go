@@ -5,22 +5,57 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
-// handleHealth показывает, что процесс приложения жив.
+// -----------------------------
+// Prometheus метрики
+// -----------------------------
+
+// Счётчик всех HTTP-запросов
+var requestsTotal = prometheus.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "http_requests_total",
+		Help: "Total number of HTTP requests",
+	},
+	[]string{"endpoint", "method"},
+)
+
+// Гистограмма времени обработки запроса
+var requestDuration = prometheus.NewHistogramVec(
+	prometheus.HistogramOpts{
+		Name: "http_request_duration_seconds",
+		Help: "Duration of HTTP requests",
+	},
+	[]string{"endpoint"},
+)
+
+// Регистрируем метрики в Prometheus
+func init() {
+	prometheus.MustRegister(requestsTotal)
+	prometheus.MustRegister(requestDuration)
+}
+
+// -----------------------------
+// Handlers
+// -----------------------------
+
+// Проверка, жив ли процесс
 func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok"))
 }
 
-// handleReady показывает, что приложение готово работать.
-// Здесь мы уже проверяем доступность базы данных.
+// Проверка готовности сервиса
+// здесь мы проверяем соединение с базой
 func (a *App) handleReady(w http.ResponseWriter, r *http.Request) {
+
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
 	if err := a.storage.Ping(ctx); err != nil {
-		http.Error(w, "database is not ready", http.StatusServiceUnavailable)
+		http.Error(w, "database not ready", http.StatusServiceUnavailable)
 		return
 	}
 
@@ -28,20 +63,37 @@ func (a *App) handleReady(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("ready"))
 }
 
-// handleEvents маршрутизирует методы GET и POST.
+// Роутер для /events
 func (a *App) handleEvents(w http.ResponseWriter, r *http.Request) {
+
+	// ---- Prometheus метрики ----
+	start := time.Now()
+
+	requestsTotal.WithLabelValues("/events", r.Method).Inc()
+
+	defer func() {
+		requestDuration.
+			WithLabelValues("/events").
+			Observe(time.Since(start).Seconds())
+	}()
+	// ----------------------------
+
 	switch r.Method {
+
 	case http.MethodPost:
 		a.createEvent(w, r)
+
 	case http.MethodGet:
 		a.listEvents(w, r)
+
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-// createEvent принимает JSON и сохраняет событие в PostgreSQL.
+// Создание события
 func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
+
 	var input Event
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -81,8 +133,9 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(result)
 }
 
-// listEvents читает события из PostgreSQL и возвращает их клиенту.
+// Получение списка событий
 func (a *App) listEvents(w http.ResponseWriter, r *http.Request) {
+
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
@@ -93,6 +146,7 @@ func (a *App) listEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := make([]Event, 0, len(rows))
+
 	for _, row := range rows {
 		result = append(result, Event{
 			ID:        row.ID,
@@ -105,5 +159,6 @@ func (a *App) listEvents(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+
 	_ = json.NewEncoder(w).Encode(result)
 }

@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-service-db
+  namespace: event-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: event-service-db
+  template:
+    metadata:
+      labels:
+        app: event-service-db
+    spec:
+      containers:
+        - name: db
+          image: postgres:15
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "events"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: event-service-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: event-service-secret
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: db-storage
+              mountPath: /var/lib/postgresql/data
+            - name: db-init
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: event-service-db-pvc
+        - name: db-init
+          configMap:
+            name: event-service-db-init

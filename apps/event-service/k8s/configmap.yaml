@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: event-service-config
+  namespace: event-service
+data:
+  PORT: "8080"
+  DB_HOST: "event-service-db"
+  DB_PORT: "5432"
+  DB_NAME: "events"
+  DB_SSLMODE: "disable"

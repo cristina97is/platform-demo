@@ -1,0 +1,11 @@
+groups:
+  - name: event-service-alerts
+    rules:
+      - alert: EventServiceDown
+        expr: up{job="event-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Event service is down"
+          description: "Prometheus cannot scrape event-service for more than 1 minute."

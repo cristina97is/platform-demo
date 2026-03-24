@@ -1,0 +1,29 @@
+groups:
+  - name: event-service-alerts
+    rules:
+      - alert: EventServiceDown
+        expr: up{job="event-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Event service is down"
+          description: "Prometheus cannot scrape event-service for more than 1 minute"
+
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency"
+          description: "95th percentile latency is higher than 0.5s"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[1m]) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate"
+          description: "Too many 5xx errors"
