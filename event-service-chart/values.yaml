@@ -1,0 +1,46 @@
+namespace: event-service
+
+api:
+  name: event-service-api
+  replicas: 2
+  image: ghcr.io/cristina97is/event-service:latest
+  port: 8080
+
+service:
+  name: event-service-api
+  port: 8080
+  targetPort: 8080
+
+ingress:
+  name: event-service-ingress
+  host: event-service.127.0.0.1.sslip.io
+  path: /
+
+db:
+  name: event-service-db
+  image: postgres:15
+  port: 5432
+  database: events
+  pvcName: event-service-db-pvc
+  storage: 1Gi
+
+secret:
+  name: event-service-secret
+  dbUser: events
+  dbPassword: events
+  postgresUser: events
+  postgresPassword: events
+
+config:
+  name: event-service-config
+  port: "8080"
+  dbHost: event-service-db
+  dbPort: "5432"
+  dbName: events
+  dbSSLMode: disable
+
+hpa:
+  name: event-service-api-hpa
+  minReplicas: 2
+  maxReplicas: 5
+  averageUtilization: 70
