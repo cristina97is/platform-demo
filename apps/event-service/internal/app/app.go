@@ -2,6 +2,7 @@ package app
 
 import (
 	"net/http"
+
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/cristina97is/platform-demo/apps/event-service/internal/config"
@@ -37,9 +38,9 @@ func (a *App) Router() http.Handler {
 
 // routes регистрирует маршруты.
 func (a *App) routes() {
+	a.router.HandleFunc("/", a.handleRoot)
 	a.router.HandleFunc("/healthz", a.handleHealth)
 	a.router.HandleFunc("/readyz", a.handleReady)
 	a.router.HandleFunc("/events", a.handleEvents)
-	   // endpoint для Prometheus
-   	 a.router.Handle("/metrics", promhttp.Handler())
+	a.router.Handle("/metrics", promhttp.Handler())
 }

@@ -4,13 +4,13 @@ import "os"
 
 // Config хранит конфигурацию приложения.
 type Config struct {
-	Port     string
-	DBHost   string
-	DBPort   string
-	DBName   string
-	DBUser   string
-	DBPass   string
-	SSLMode  string
+	Port    string
+	DBHost  string
+	DBPort  string
+	DBName  string
+	DBUser  string
+	DBPass  string
+	SSLMode string
 }
 
 // getenvOrDefault возвращает значение переменной окружения,

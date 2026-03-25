@@ -13,7 +13,6 @@ import (
 // Prometheus метрики
 // -----------------------------
 
-// Счётчик всех HTTP-запросов
 var requestsTotal = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
 		Name: "http_requests_total",
@@ -22,7 +21,6 @@ var requestsTotal = prometheus.NewCounterVec(
 	[]string{"endpoint", "method"},
 )
 
-// Гистограмма времени обработки запроса
 var requestDuration = prometheus.NewHistogramVec(
 	prometheus.HistogramOpts{
 		Name: "http_request_duration_seconds",
@@ -31,7 +29,6 @@ var requestDuration = prometheus.NewHistogramVec(
 	[]string{"endpoint"},
 )
 
-// Регистрируем метрики в Prometheus
 func init() {
 	prometheus.MustRegister(requestsTotal)
 	prometheus.MustRegister(requestDuration)
@@ -41,6 +38,30 @@ func init() {
 // Handlers
 // -----------------------------
 
+// Главная страница сервиса
+func (a *App) handleRoot(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	response := map[string]any{
+		"service": "event-service",
+		"status":  "running",
+		"endpoints": []string{
+			"/",
+			"/healthz",
+			"/readyz",
+			"/events",
+			"/metrics",
+		},
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(response)
+}
+
 // Проверка, жив ли процесс
 func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
@@ -48,9 +69,7 @@ func (a *App) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // Проверка готовности сервиса
-// здесь мы проверяем соединение с базой
 func (a *App) handleReady(w http.ResponseWriter, r *http.Request) {
-
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 
@@ -65,8 +84,6 @@ func (a *App) handleReady(w http.ResponseWriter, r *http.Request) {
 
 // Роутер для /events
 func (a *App) handleEvents(w http.ResponseWriter, r *http.Request) {
-
-	// ---- Prometheus метрики ----
 	start := time.Now()
 
 	requestsTotal.WithLabelValues("/events", r.Method).Inc()
@@ -76,16 +93,12 @@ func (a *App) handleEvents(w http.ResponseWriter, r *http.Request) {
 			WithLabelValues("/events").
 			Observe(time.Since(start).Seconds())
 	}()
-	// ----------------------------
 
 	switch r.Method {
-
 	case http.MethodPost:
 		a.createEvent(w, r)
-
 	case http.MethodGet:
 		a.listEvents(w, r)
-
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -93,7 +106,6 @@ func (a *App) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 // Создание события
 func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
-
 	var input Event
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -135,7 +147,6 @@ func (a *App) createEvent(w http.ResponseWriter, r *http.Request) {
 
 // Получение списка событий
 func (a *App) listEvents(w http.ResponseWriter, r *http.Request) {
-
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
