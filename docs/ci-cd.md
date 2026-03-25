@@ -1,41 +1,27 @@
-# CI/CD
+# CI/CD Flow
 
-## Goal
+## Overview
 
-The goal of the delivery flow is to make application updates repeatable and predictable.
+The project uses a mixed delivery model adapted for a local Kubernetes environment (kind).
 
-## Current workflow
+### CI
 
-At the moment the project uses a semi-manual delivery process:
+GitHub Actions pipeline performs:
 
-1. Application code is updated locally.
-2. A Docker image is built locally.
-3. The image is loaded into the local `kind` cluster.
-4. Kubernetes manifests are applied to deploy or update the application.
-5. Service availability is verified through:
-   - `/healthz`
-   - `/readyz`
-   - Ingress URL
+- gofmt check
+- go vet
+- go test
+- Docker image build
+- Docker image push to GitHub Container Registry (GHCR)
 
-## Example delivery flow
+Published images:
 
-```text
-Code change
-   |
-   v
-Docker build
-   |
-   v
-Local image: event-service:local
-   |
-   v
-kind load docker-image
-   |
-   v
-kubectl apply
-   |
-   v
-Kubernetes Deployment update
-   |
-   v
-Health check verification
+- ghcr.io/cristina97is/event-service:latest
+- ghcr.io/cristina97is/event-service:<commit-sha>
+
+### Deployment
+
+The main deployment path uses Helm and GHCR image:
+
+```bash
+helm upgrade --install event-service event-service-chart -n event-service
