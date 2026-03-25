@@ -21,3 +21,7 @@ dist/
 *.tfstate.*
 crash.log
 .terraform.lock.hcl
+
+# Terraform state
+*.tfstate
+*.tfstate.*
