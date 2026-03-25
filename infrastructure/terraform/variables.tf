@@ -23,7 +23,7 @@ variable "image_repository" {
 }
 
 variable "image_tag" {
-  description = "Container image tag"
+  description = "Container image tag. latest is fallback only."
   type        = string
   default     = "latest"
 }

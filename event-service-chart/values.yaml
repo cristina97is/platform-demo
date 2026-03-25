@@ -28,11 +28,8 @@ db:
   storage: 1Gi
 
 secret:
-  name: event-service-secret
-  dbUser: events
-  dbPassword: events
-  postgresUser: events
-  postgresPassword: events
+  existingSecret: event-service-secret
+  create: false
 
 config:
   name: event-service-config
