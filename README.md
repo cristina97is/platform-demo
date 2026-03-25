@@ -2,43 +2,72 @@
 
 ## О проекте
 
-Event Service — backend-сервис на Go для обработки событий, развернутый в Kubernetes.
+Event Service — backend-сервис на Go для обработки и хранения событий, развернутый в Kubernetes.
 
-Цель проекта — продемонстрировать не только реализацию API, но и полноценный инженерный подход к разработке и эксплуатации сервиса с учетом масштабируемости, отказоустойчивости, наблюдаемости, управления конфигурацией и автоматизации CI.
+Проект демонстрирует базовый платформенный контур вокруг сервиса:
 
-Проект реализован как локальная production-like среда на базе kind (Kubernetes in Docker), что позволяет воспроизводить реальные сценарии без использования облака.
+- разработка приложения
+- контейнеризация
+- локальный запуск
+- деплой в Kubernetes
+- управление конфигурацией
+- observability
+- CI pipeline
+- deployment через Helm
+- управление deployment через Terraform
 
-Сервис может использоваться для логирования пользовательских действий, трекинга событий, обработки транзакционных операций и сбора телеметрии.
+Система разворачивается в локальном Kubernetes-кластере на базе kind.
+
+---
+
+## Функциональность
+
+Сервис предоставляет HTTP API:
+
+- `GET /healthz` — проверка доступности процесса
+- `GET /readyz` — проверка доступности базы данных
+- `GET /events` — получение списка событий
+- `POST /events` — создание события
+- `GET /metrics` — метрики Prometheus
+
+Пример payload:
+
+```json
+{
+  "user_id": 1,
+  "type": "bet",
+  "amount": 100
+}
+```
+
+---
 
 ## Архитектура
 
-Архитектура построена по принципу разделения ответственности:
+Система состоит из следующих компонентов:
 
-- API отвечает за обработку запросов
-- база данных отвечает за хранение
-- Kubernetes управляет жизненным циклом
-- мониторинг вынесен в отдельный слой
+- API-сервис (Go)
+- PostgreSQL
+- Kubernetes
+- Ingress
+- Prometheus
+- Grafana
 
-Компоненты системы:
+### Поток запроса
 
-- Go API (event-service)
-- PostgreSQL (stateful storage)
-- Kubernetes (оркестрация)
-- Ingress (входной трафик)
-- Prometheus (сбор метрик)
-- Grafana (визуализация)
+1. Клиент → Ingress  
+2. Ingress → Service  
+3. Service → Pod (API)  
+4. API → PostgreSQL  
+5. API → `/metrics`  
+6. Prometheus → сбор метрик  
+7. Grafana → визуализация  
 
-Сценарий работы:
-
-1. Клиент отправляет запрос в `/events`
-2. API обрабатывает запрос и сохраняет данные в PostgreSQL
-3. API экспортирует метрики через `/metrics`
-4. Prometheus собирает метрики
-5. Grafana отображает их
-6. Kubernetes управляет pod’ами и их состоянием
+---
 
 ## Структура проекта
 
+```text
 platform-demo/
 ├── .github/workflows/ci.yml
 ├── apps/event-service/
@@ -56,139 +85,413 @@ platform-demo/
 ├── docs/
 ├── load-test/
 └── README.md
+```
 
-## Технологии и выбор стека
+---
 
-Go выбран как основной язык благодаря высокой производительности, простоте деплоя и широкому использованию в cloud-native экосистеме.
+## Технологии и обоснование выбора
 
-PostgreSQL используется как надежная ACID-база данных с поддержкой сложных запросов и аналитики.
+### Go
 
-Kubernetes применяется как стандартный оркестратор контейнеров, обеспечивающий масштабирование, self-healing и декларативное управление.
+Используется для реализации API.
 
-Prometheus и Grafana используются для мониторинга и визуализации метрик.
+Причины выбора:
 
-Helm используется как основной инструмент для управления deployment-конфигурацией.
+- низкие накладные расходы рантайма
+- простой деплой (один бинарник)
+- стандартная библиотека покрывает HTTP-сервер и работу с сетью
+- распространён в cloud-native инструментах
 
-Terraform применяется для управления deployment layer (namespace и Helm release).
+Применение в проекте:
 
-## Основные инженерные решения
+- HTTP сервер (`net/http`)
+- обработка запросов
+- экспорт метрик
+- конфигурация через env
 
-Конфигурация отделена от кода через ConfigMap и Secret, что позволяет изменять параметры без пересборки приложения и не хранить чувствительные данные в коде.
+---
 
-Для PostgreSQL используется PersistentVolumeClaim, что обеспечивает сохранность данных при рестарте pod’ов.
+### PostgreSQL
 
-Добавлены readiness и liveness probes, чтобы Kubernetes корректно управлял жизненным циклом контейнеров.
+Используется как основное хранилище.
 
-API разворачивается с двумя репликами для обеспечения отказоустойчивости и балансировки нагрузки.
+Причины выбора:
 
-Используется стратегия RollingUpdate для обновлений без downtime.
+- транзакционность (ACID)
+- предсказуемое поведение
+- стандартное решение для backend-сервисов
 
-Настроен Horizontal Pod Autoscaler, который масштабирует сервис в зависимости от нагрузки.
+Применение:
 
-Используется PodDisruptionBudget для защиты от одновременного удаления всех pod’ов.
+- хранение событий
+- инициализация через SQL-migration
+- доступ через pgx
 
-Сервис экспортирует метрики через `/metrics`, что позволяет интегрироваться с Prometheus.
+---
+
+### Docker
+
+Используется для упаковки приложения.
+
+Причины выбора:
+
+- единый формат артефакта
+- воспроизводимость окружения
+- одинаковый запуск в CI и Kubernetes
+
+Применение:
+
+- multi-stage build
+- минимальный runtime-образ
+
+---
+
+### Docker Compose
+
+Используется для локального запуска.
+
+Причины выбора:
+
+- быстрый запуск всех компонентов
+- изоляция окружения разработки
+- отсутствие зависимости от Kubernetes
+
+Применение:
+
+- API
+- PostgreSQL
+- Prometheus
+- Grafana
+
+---
+
+### Kubernetes
+
+Используется как runtime-платформа.
+
+Причины выбора:
+
+- управление контейнерами
+- автоматическое восстановление
+- масштабирование
+- декларативная конфигурация
+
+Применение:
+
+- Deployment
+- Service
+- Ingress
+- ConfigMap
+- Secret
+- PVC
+- HPA
+- PDB
+
+---
+
+### kind
+
+Используется как локальный кластер Kubernetes.
+
+Причины выбора:
+
+- запуск в Docker
+- отсутствие зависимости от облака
+- возможность воспроизвести k8s-сценарии локально
+
+---
+
+### Helm
+
+Используется для управления deployment.
+
+Причины выбора:
+
+- шаблонизация Kubernetes manifests
+- централизованная конфигурация
+- управление релизами
+
+Применение:
+
+- chart `event-service-chart`
+- управление image, replicas, ingress, HPA
+
+---
+
+### Terraform
+
+Используется для управления deployment layer.
+
+Причины выбора:
+
+- декларативное описание инфраструктуры
+- воспроизводимость состояния
+
+Применение:
+
+- создание namespace
+- управление Helm release
+
+---
+
+### Prometheus
+
+Используется для сбора метрик.
+
+Причины выбора:
+
+- стандарт для Kubernetes
+- pull-модель
+- интеграция с Go
+
+Применение:
+
+- scrape `/metrics`
+- алерты
+
+---
+
+### Grafana
+
+Используется для визуализации.
+
+Причины выбора:
+
+- стандартный UI для метрик
+- удобные дашборды
+
+---
+
+### GitHub Actions
+
+Используется как CI.
+
+Причины выбора:
+
+- интеграция с GitHub
+- простая настройка
+- прозрачность pipeline
+
+---
+
+### GHCR
+
+Используется как container registry.
+
+Причины выбора:
+
+- хранение Docker-образов
+- интеграция с GitHub Actions
+
+---
+
+### k6
+
+Используется для нагрузочного тестирования.
+
+Причины выбора:
+
+- простой синтаксис
+- подходит для HTTP-нагрузки
+
+---
+
+## Реализация
+
+### Конфигурация
+
+Используются переменные окружения:
+
+- `PORT`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
+- `DB_SSLMODE`
+
+В Kubernetes:
+
+- ConfigMap — для конфигурации
+- Secret — для чувствительных данных
+
+---
+
+### Хранение данных
+
+- PostgreSQL
+- PersistentVolumeClaim
+- сохранение данных между рестартами
+
+---
+
+### Health checks
+
+- `healthz` — проверка процесса
+- `readyz` — проверка подключения к БД
+
+Используется в liveness и readiness probes.
+
+---
+
+### Масштабирование
+
+- 2 replicas API
+- Horizontal Pod Autoscaler (2–5 pod)
+
+---
+
+### Обновления
+
+- RollingUpdate
+- постепенная замена pod’ов
+
+---
+
+### Надёжность
+
+- PodDisruptionBudget
+- защита от полной потери сервиса
+
+---
+
+### Метрики
+
+- `/metrics`
+- Prometheus scrape
+- базовые показатели:
+  - количество запросов
+  - latency
+
+---
 
 ## CI Pipeline
 
-GitHub Actions pipeline выполняет:
+Pipeline выполняет:
 
-- проверку форматирования (gofmt)
-- статический анализ (go vet)
-- запуск тестов (go test)
-- lint Dockerfile (hadolint)
-- проверку Helm chart (helm lint)
-- валидацию Kubernetes-манифестов (kubeconform)
-- сборку Docker-образа
-- security scan образа (Trivy)
-- публикацию образа в GitHub Container Registry (GHCR)
+- gofmt
+- go vet
+- go test
+- hadolint
+- helm lint
+- kubeconform
+- docker build
+- Trivy scan
+- push в GHCR
 
-Публикуются два тега:
+Теги:
 
-- latest
-- commit SHA
+- `latest`
+- `<commit-sha>`
 
-Это обеспечивает единый deployment artifact и контроль качества как кода, так и инфраструктуры.
+---
 
 ## Deployment
 
-Основной способ деплоя — через Helm:
+### Helm
 
+```bash
 helm upgrade --install event-service event-service-chart -n event-service
+```
 
-Helm использует Docker-образ из GHCR, что связывает CI и runtime.
+Используется образ из GHCR.
 
-Terraform используется как слой управления deployment и управляет namespace и Helm release:
+---
 
+### Terraform
+
+```bash
 cd infrastructure/terraform
 terraform init
 terraform apply
+```
 
-Для локального запуска используется:
+Управляет:
 
+- namespace
+- Helm release
+
+---
+
+## Локальный запуск
+
+### Docker Compose
+
+```bash
+cd apps/event-service
+cp .env.example .env
+docker compose up --build
+```
+
+---
+
+### Kubernetes
+
+```bash
 ./scripts/release-local.sh
+```
 
-По умолчанию используется образ из GHCR, но доступен dev-режим с локальной сборкой через переменную LOCAL_IMAGE=true.
+Dev режим:
 
-## Работа с секретами
+```bash
+LOCAL_IMAGE=true ./scripts/release-local.sh
+```
 
-Реальные значения секретов не хранятся в репозитории.
+---
 
-Для Kubernetes используется внешний Secret, который создаётся отдельно:
+## Секреты
 
+Секреты не хранятся в Git.
+
+Создаются вручную:
+
+```bash
 kubectl create secret generic event-service-secret \
   -n event-service \
   --from-literal=DB_USER=events \
   --from-literal=DB_PASSWORD=change-me \
   --from-literal=POSTGRES_USER=events \
   --from-literal=POSTGRES_PASSWORD=change-me
+```
 
-В репозитории присутствует только шаблон:
-
-apps/event-service/k8s/secret.example.yaml
-
-Для docker-compose используется файл `.env`, который не коммитится в репозиторий:
-
-cd apps/event-service
-cp .env.example .env
-docker compose up --build
+---
 
 ## Доступ
 
+```text
 http://event-service.127.0.0.1.sslip.io
+```
+
+---
 
 ## Нагрузочное тестирование
 
+```bash
 cd load-test
 k6 run test.js
+```
+
+---
 
 ## Ограничения
 
-Проект развёрнут в локальном окружении, поэтому:
+- нет автоматического CD
+- локальный кластер
+- нет внешнего secret manager
 
-- отсутствует полноценный auto-CD из GitHub Actions
-- нет удалённого Kubernetes-кластера
-- управление секретами реализовано на уровне demo (без Vault/External Secrets)
-
-## Что демонстрирует проект
-
-- разработку сервиса на Go
-- работу с Kubernetes
-- Helm deployment
-- Terraform integration
-- CI pipeline с quality и security проверками
-- безопасную работу с конфигурацией и секретами
-- observability
-- масштабирование и отказоустойчивость
+---
 
 ## Возможные улучшения
 
-- внедрение полноценного CD (self-hosted runner или GitOps)
-- использование immutable image tag вместо latest
-- интеграция с внешним secret manager
-- переход на удалённый кластер
-- централизованный logging (Loki)
+- CD pipeline
+- immutable image tags
+- external secrets
+- удалённый кластер
+- централизованный logging
+
+---
 
 ## Автор
 
 Kristina
+
