@@ -3,7 +3,10 @@ namespace: event-service
 api:
   name: event-service-api
   replicas: 2
-  image: ghcr.io/cristina97is/event-service:latest
+  image:
+    repository: ghcr.io/cristina97is/event-service
+    tag: latest
+    pullPolicy: Always
   port: 8080
 
 service:

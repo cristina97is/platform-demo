@@ -5,7 +5,10 @@ CLUSTER_NAME="${CLUSTER_NAME:-platform-demo}"
 NAMESPACE="${NAMESPACE:-event-service}"
 HELM_RELEASE="${HELM_RELEASE:-event-service}"
 HELM_CHART="${HELM_CHART:-event-service-chart}"
-GHCR_IMAGE="${GHCR_IMAGE:-ghcr.io/cristina97is/event-service:latest}"
+
+IMAGE_REPOSITORY="${IMAGE_REPOSITORY:-ghcr.io/cristina97is/event-service}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+
 LOCAL_IMAGE="${LOCAL_IMAGE:-false}"
 LOCAL_IMAGE_NAME="${LOCAL_IMAGE_NAME:-event-service:local}"
 
@@ -15,11 +18,17 @@ if [ "$LOCAL_IMAGE" = "true" ]; then
   kind load docker-image "$LOCAL_IMAGE_NAME" --name "$CLUSTER_NAME"
 
   helm upgrade --install "$HELM_RELEASE" "$HELM_CHART" -n "$NAMESPACE" \
-    --set api.image="$LOCAL_IMAGE_NAME"
+    --set api.image.repository="event-service" \
+    --set api.image.tag="local" \
+    --set api.image.pullPolicy="IfNotPresent"
 else
   echo "==> Using registry image flow"
+  echo "==> Image: ${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+
   helm upgrade --install "$HELM_RELEASE" "$HELM_CHART" -n "$NAMESPACE" \
-    --set api.image="$GHCR_IMAGE"
+    --set api.image.repository="$IMAGE_REPOSITORY" \
+    --set api.image.tag="$IMAGE_TAG" \
+    --set api.image.pullPolicy="Always"
 fi
 
 echo "==> Wait for rollout"

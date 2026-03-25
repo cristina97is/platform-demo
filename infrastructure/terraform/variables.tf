@@ -15,3 +15,15 @@ variable "helm_chart_path" {
   type        = string
   default     = "../../event-service-chart"
 }
+
+variable "image_repository" {
+  description = "Container image repository"
+  type        = string
+  default     = "ghcr.io/cristina97is/event-service"
+}
+
+variable "image_tag" {
+  description = "Container image tag"
+  type        = string
+  default     = "latest"
+}

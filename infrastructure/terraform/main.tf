@@ -17,4 +17,14 @@ resource "helm_release" "event_service" {
     name  = "namespace"
     value = var.namespace
   }
+
+  set {
+    name  = "api.image.repository"
+    value = var.image_repository
+  }
+
+  set {
+    name  = "api.image.tag"
+    value = var.image_tag
+  }
 }
