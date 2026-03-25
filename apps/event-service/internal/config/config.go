@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"log"
+	"os"
+)
 
 // Config хранит конфигурацию приложения.
 type Config struct {
@@ -13,9 +16,7 @@ type Config struct {
 	SSLMode string
 }
 
-// getenvOrDefault возвращает значение переменной окружения,
-// а если она не задана — значение по умолчанию.
-func getenvOrDefault(key, fallback string) string {
+func getEnv(key, fallback string) string {
 	value := os.Getenv(key)
 	if value == "" {
 		return fallback
@@ -23,15 +24,23 @@ func getenvOrDefault(key, fallback string) string {
 	return value
 }
 
+func mustGetEnv(key string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		log.Fatalf("environment variable %s is required", key)
+	}
+	return value
+}
+
 // Load загружает конфигурацию приложения из env.
 func Load() Config {
 	return Config{
-		Port:    getenvOrDefault("PORT", "8080"),
-		DBHost:  getenvOrDefault("DB_HOST", "localhost"),
-		DBPort:  getenvOrDefault("DB_PORT", "5432"),
-		DBName:  getenvOrDefault("DB_NAME", "events"),
-		DBUser:  getenvOrDefault("DB_USER", "events"),
-		DBPass:  getenvOrDefault("DB_PASSWORD", "events"),
-		SSLMode: getenvOrDefault("DB_SSLMODE", "disable"),
+		Port:    getEnv("PORT", "8080"),
+		DBHost:  getEnv("DB_HOST", "localhost"),
+		DBPort:  getEnv("DB_PORT", "5432"),
+		DBName:  getEnv("DB_NAME", "events"),
+		DBUser:  mustGetEnv("DB_USER"),
+		DBPass:  mustGetEnv("DB_PASSWORD"),
+		SSLMode: getEnv("DB_SSLMODE", "disable"),
 	}
 }
