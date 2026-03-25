@@ -91,7 +91,7 @@ latest используется только как fallback. Основной d
 
 ## Deployment
 
-Основной способ:
+Основной способ deployment:
 
 IMAGE_TAG=<commit-sha> ./scripts/release-local.sh
 
@@ -99,11 +99,13 @@ IMAGE_TAG=<commit-sha> ./scripts/release-local.sh
 
 IMAGE_TAG=db93f41 ./scripts/release-local.sh
 
-Deployment использует образ:
+Это обеспечивает:
 
-ghcr.io/cristina97is/event-service:<commit-sha>
+- воспроизводимость
+- контроль версии
+- возможность отката
 
-Это обеспечивает воспроизводимость, контроль версии и возможность отката.
+Если IMAGE_TAG не указан, используется latest как fallback.
 
 Dev режим (только для локальной разработки):
 
