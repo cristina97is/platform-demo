@@ -24,7 +24,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: apps/event-service/go.mod
-          cache: true
+          cache-dependency-path: apps/event-service/go.sum
 
       - name: Download deps
         run: go mod download
